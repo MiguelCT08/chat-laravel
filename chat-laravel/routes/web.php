@@ -13,3 +13,7 @@ Route::view('profile', 'profile')
     ->name('profile');
 
 require __DIR__.'/auth.php';
+
+Route::view('chat', 'chat')
+    ->middleware(['auth', 'verified'])
+    ->name('chat');
