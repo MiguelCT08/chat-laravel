@@ -34,5 +34,7 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+    'mindlinks' => [
+    'sso_secret' => env('MINDLINKS_SSO_SECRET'),
+],
 ];

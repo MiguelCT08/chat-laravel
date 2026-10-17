@@ -17,3 +17,7 @@ require __DIR__.'/auth.php';
 Route::view('chat', 'chat')
     ->middleware(['auth', 'verified'])
     ->name('chat');
+
+use App\Http\Controllers\SsoController;
+
+Route::get('/sso', [SsoController::class, 'login']);
