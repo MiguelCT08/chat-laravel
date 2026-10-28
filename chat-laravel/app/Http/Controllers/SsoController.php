@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/SsoController.php
 
 namespace App\Http\Controllers;
 
@@ -14,59 +13,48 @@ class SsoController extends Controller
 {
     public function login(Request $request)
     {
-        $dados      = (string) $request->query('d');
-        $assinatura = (string) $request->query('s');
-        $segredo    = config('services.mindlinks.sso_secret');
+        $dados      = (string) $request->query('d', '');
+        $assinatura = (string) $request->query('s', '');
+        $segredo    = (string) env('MINDLINKS_SSO_SECRET', '');
 
-        abort_if(! $dados || ! $assinatura || ! $segredo, 403);
+        if ($dados === '' || $assinatura === '' || $segredo === '') {
+            abort(403, 'Link de acesso inválido.');
+        }
 
-        // 1) Assinatura válida? (comparação segura contra timing attack)
-        $esperada = hash_hmac('sha256', $dados, $segredo);
-        abort_unless(hash_equals($esperada, $assinatura), 403);
+        if (! hash_equals(hash_hmac('sha256', $dados, $segredo), $assinatura)) {
+            abort(403, 'Assinatura inválida.');
+        }
 
-        // 2) Decodifica o payload
-        $payload = json_decode(base64_decode(strtr($dados, '-_', '+/')), true);
+        $b64 = strtr($dados, '-_', '+/');
+        $b64 = str_pad($b64, strlen($b64) + (4 - strlen($b64) % 4) % 4, '=');
+        $payload = json_decode((string) base64_decode($b64, true), true);
 
-        abort_unless(
-            is_array($payload)
-            && isset($payload['id'], $payload['nome'], $payload['email'], $payload['exp'], $payload['nonce']),
-            403
+        if (! is_array($payload) || empty($payload['email']) || ($payload['exp'] ?? 0) < time()) {
+            abort(403, 'Link expirado.');
+        }
+
+        // uso único: o mesmo link não funciona duas vezes
+        if (! Cache::add('sso_nonce_'.($payload['nonce'] ?? ''), true, 120)) {
+            abort(403, 'Link já utilizado.');
+        }
+
+        $user = User::firstOrCreate(
+            ['email' => $payload['email']],
+            ['name' => $payload['nome'], 'password' => Hash::make(Str::random(40))]
         );
 
-        // 3) Token ainda dentro da validade?
-        abort_if($payload['exp'] < time(), 403, 'Link expirado. Volte ao MindLinks e abra o chat novamente.');
-
-        // 4) Uso único: o mesmo token não pode ser usado duas vezes
-        abort_unless(Cache::add('sso_nonce_' . $payload['nonce'], true, 120), 403);
-
-        // 5) Localiza (ou cria) o usuário do chat
-        $user = User::where('mindlinks_id', $payload['id'])->first()
-            ?? User::where('email', $payload['email'])->first()
-            ?? new User();
-
-        $user->mindlinks_id = $payload['id'];
-        $user->name         = $payload['nome'];
-
-        // só troca o e-mail se ele não pertencer a outro usuário do chat
-        $emailLivre = ! User::where('email', $payload['email'])
-            ->where('id', '!=', $user->id ?? 0)
-            ->exists();
-
-        if (! $user->exists || $emailLivre) {
-            $user->email = $payload['email'];
+        if (! $user->email_verified_at) {
+            $user->forceFill(['email_verified_at' => now()])->save();
         }
 
-        if (! $user->exists) {
-            // senha aleatória: o login acontece só pelo MindLinks
-            $user->password = Hash::make(Str::random(40));
-        }
-
-        $user->email_verified_at = $user->email_verified_at ?? now();
-        $user->save();
-
-        // 6) Loga e entra no chat
         Auth::login($user);
         $request->session()->regenerate();
+        session(['mindlinks' => [
+            'id'                 => $payload['id'] ?? null,
+            'tipo'               => $payload['tipo'] ?? null,
+            'status_verificacao' => $payload['status_verificacao'] ?? null,
+            'eh_admin'           => $payload['eh_admin'] ?? 0,
+        ]]);
 
         return redirect('/chat');
     }

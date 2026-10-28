@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'mindlinks_id', 'tipo', 'status_verificacao', 'tema_experiencia', 'eh_admin'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -29,6 +29,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'eh_admin' => 'boolean',
         ];
     }
 
@@ -40,5 +41,9 @@ class User extends Authenticatable
     public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
+    }
+    public function podeCriarGrupo(): bool
+    {
+        return $this->tipo === 'apoiador' && $this->status_verificacao === 'aprovado';
     }
 }
