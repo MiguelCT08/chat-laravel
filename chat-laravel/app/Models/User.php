@@ -42,6 +42,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Message::class);
     }
+        public function eApoiadorVerificado(): bool
+    {
+        return $this->tipo === 'apoiador' && $this->status_verificacao === 'aprovado';
+    }
     public function podeCriarGrupo(): bool
     {
         return $this->tipo === 'apoiador' && $this->status_verificacao === 'aprovado';

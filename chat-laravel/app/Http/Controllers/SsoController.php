@@ -40,12 +40,19 @@ class SsoController extends Controller
 
         $user = User::firstOrCreate(
             ['email' => $payload['email']],
-            ['name' => $payload['nome'], 'password' => Hash::make(Str::random(40))]
+            ['name' => $payload['nome'] ?? 'Usuário', 'password' => Hash::make(Str::random(40))]
         );
 
-        if (! $user->email_verified_at) {
-            $user->forceFill(['email_verified_at' => now()])->save();
-        }
+        // sincroniza com o MindLinks a cada login (o payload é assinado, então é confiável)
+        $user->forceFill([
+            'name'               => $payload['nome'] ?? $user->name,
+            'mindlinks_id'       => $payload['id'] ?? $user->mindlinks_id,
+            'tipo'               => $payload['tipo'] ?? $user->tipo,
+            'status_verificacao' => $payload['status_verificacao'] ?? $user->status_verificacao,
+            'tema_experiencia'   => $payload['tema_experiencia'] ?? $user->tema_experiencia,
+            'eh_admin'           => (bool) ($payload['eh_admin'] ?? false),
+            'email_verified_at'  => $user->email_verified_at ?? now(),
+        ])->save();
 
         Auth::login($user);
         $request->session()->regenerate();

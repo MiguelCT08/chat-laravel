@@ -106,8 +106,10 @@ new class extends Component {
             <button wire:key="conv-{{ $conversation->id }}"
                     wire:click="select({{ $conversation->id }})"
                     class="block w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 {{ $conversationId === $conversation->id ? 'bg-gray-100 dark:bg-gray-700' : '' }}">
+                @php($outro = $conversation->name ? null : $conversation->users->firstWhere('id', '!=', auth()->id()))
                 <div class="font-medium text-gray-900 dark:text-gray-100">
-                    {{ $conversation->name ?: $conversation->users->firstWhere('id', '!=', auth()->id())?->name }}
+                    {{ $conversation->name ?: $outro?->name }}
+                    <x-selo-apoiador :user="$outro" />
                 </div>
                 <div class="truncate text-sm text-gray-500">
                     {{ $conversation->latestMessage?->body ?? 'Sem mensagens' }}
@@ -123,6 +125,7 @@ new class extends Component {
                     wire:click="start({{ $person->id }})"
                     class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
                 {{ $person->name }}
+                <x-selo-apoiador :user="$person" />
             </button>
         @endforeach
     </aside>
@@ -131,7 +134,9 @@ new class extends Component {
     <section class="flex w-2/3 flex-col">
         @if ($this->current)
             <header class="border-b border-gray-200 px-4 py-3 font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
-                {{ $this->current->name ?: $this->current->users->firstWhere('id', '!=', auth()->id())?->name }}
+                @php($outroCab = $this->current->name ? null : $this->current->users->firstWhere('id', '!=', auth()->id()))
+                {{ $this->current->name ?: $outroCab?->name }}
+                <x-selo-apoiador :user="$outroCab" />
             </header>
 
             {{-- flex-col-reverse mantém a rolagem ancorada nas mensagens mais novas --}}
@@ -140,6 +145,12 @@ new class extends Component {
                     @php($mine = $message->user_id === auth()->id())
                     <div wire:key="msg-{{ $message->id }}" class="flex {{ $mine ? 'justify-end' : 'justify-start' }}">
                         <div class="max-w-[75%] rounded-lg px-3 py-2 {{ $mine ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100' }}">
+                            @unless ($mine)
+                                <p class="mb-1 text-xs font-semibold">
+                                    {{ $message->user->name }}
+                                    <x-selo-apoiador :user="$message->user" />
+                                </p>
+                            @endunless
                             <p class="whitespace-pre-line break-words">{{ $message->body }}</p>
                             <p class="mt-1 text-right text-xs opacity-70">{{ $message->created_at->format('H:i') }}</p>
                         </div>
